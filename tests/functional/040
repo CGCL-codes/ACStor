@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Test vdi object recovery just after vdi creation
+
+. ./common
+
+_start_sheep 0
+_wait_for_sheep 1
+
+_cluster_format -c 1
+
+# create vdi in background
+$DOG vdi create test 4G &
+
+# the created vdi object will be move from sheep 0 to sheep 1
+_start_sheep 1
+
+# wait for background process
+wait $!
+_wait_for_sheep 2
+
+_vdi_list -p 7000
+_vdi_list -p 7001

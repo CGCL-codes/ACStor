@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Test sheep recovery logic
+
+. ./common
+
+for i in `seq 0 1`; do _start_sheep $i; done
+
+_wait_for_sheep 2
+
+_cluster_format -c 2
+
+$DOG vdi create test 100M
+
+for i in `seq 0 24`; do
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+$DOG vdi read test | md5sum
+
+for i in 2 3; do
+    _start_sheep $i
+    sleep 1
+    _kill_sheep $(($i-2))
+    _wait_for_sheep_recovery $i
+done
+
+# write different content
+for i in `seq 0 24`; do
+    echo $(($i+1)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512 -p 7002
+done
+
+$DOG vdi read test -p 7002 | md5sum
+
+for i in 2 3; do
+    _start_sheep $(($i-2))
+    sleep 1
+    _kill_sheep $i
+    _wait_for_sheep_recovery $(($i-2))
+done
+
+$DOG vdi read test | md5sum
+$DOG vdi read test -p 7001 | md5sum
+
+$DOG vdi object test
+
+for i in `seq 0 24`; do
+    $DOG vdi object -i $i test
+done

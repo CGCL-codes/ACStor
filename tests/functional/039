@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Test vdi rollback
+
+. ./common
+
+for i in `seq 0 4`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 5
+
+_cluster_format
+$DOG vdi create test 4G
+
+$QEMU_IO -c "write 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$DOG vdi snapshot test -s snap1
+$QEMU_IO -c "write 0 512 -P 2" sheepdog:test | _filter_qemu_io
+
+echo yes | $DOG vdi rollback test -s snap1
+$QEMU_IO -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$DOG vdi tree | _filter_short_date
+_vdi_list
+
+$QEMU_IO -c "write 0 512 -P 2" sheepdog:test | _filter_qemu_io
+$DOG vdi snapshot test -s snap2
+$QEMU_IO -c "write 0 512 -P 3" sheepdog:test | _filter_qemu_io
+
+echo yes | $DOG vdi rollback test -s snap1
+$QEMU_IO -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$DOG vdi tree | _filter_short_date
+_vdi_list
+
+echo yes | $DOG vdi rollback test -s snap2
+$QEMU_IO -c "read 0 512 -P 2" sheepdog:test | _filter_qemu_io
+$DOG vdi tree | _filter_short_date
+_vdi_list
+
+echo yes | $DOG vdi rollback test -s snap1
+$QEMU_IO -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$DOG vdi tree | _filter_short_date
+_vdi_list
+
+$QEMU_IO -c "write 0 512 -P 3" sheepdog:test | _filter_qemu_io
+$DOG vdi snapshot test -s snap3
+$QEMU_IO -c "write 0 512 -P 4" sheepdog:test | _filter_qemu_io
+$DOG vdi snapshot test -s snap4
+
+# these fail since the snap ids don't belong to snapshots
+echo yes | $DOG vdi rollback test -s 0
+echo yes | $DOG vdi rollback test -s 5
+
+echo yes | $DOG vdi rollback test -s snap3
+$QEMU_IO -c "read 0 512 -P 3" sheepdog:test | _filter_qemu_io
+$DOG vdi tree | _filter_short_date
+_vdi_list

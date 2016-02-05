@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Test list preparation of sheep recovery logic
+
+. ./common
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format -c 1
+
+$DOG vdi create test 40M -P
+
+_kill_sheep 2
+_wait_for_sheep_recovery 0
+_start_sheep 2
+_wait_for_sheep_recovery 0
+
+$DOG vdi check test

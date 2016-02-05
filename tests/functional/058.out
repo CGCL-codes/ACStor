@@ -1,0 +1,34 @@
+QA output created by 058
+using backend plain store
+discard 104857600/104857600 bytes at offset 0
+100 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
+finish check&repair test
+The inode object 0x7c2b25 idx 0 is not allocated
+The inode object 0x7c2b25 idx 1 is not allocated
+The inode object 0x7c2b25 idx 2 is not allocated
+The inode object 0x7c2b25 idx 3 is not allocated
+The inode object 0x7c2b25 idx 4 is not allocated
+The inode object 0x7c2b25 idx 5 is not allocated
+The inode object 0x7c2b25 idx 6 is not allocated
+The inode object 0x7c2b25 idx 7 is not allocated
+The inode object 0x7c2b25 idx 8 is not allocated
+The inode object 0x7c2b25 idx 9 is not allocated
+The inode object 0x7c2b25 idx 10 is not allocated
+The inode object 0x7c2b25 idx 11 is not allocated
+The inode object 0x7c2b25 idx 12 is not allocated
+The inode object 0x7c2b25 idx 13 is not allocated
+The inode object 0x7c2b25 idx 14 is not allocated
+The inode object 0x7c2b25 idx 15 is not allocated
+The inode object 0x7c2b25 idx 16 is not allocated
+The inode object 0x7c2b25 idx 17 is not allocated
+The inode object 0x7c2b25 idx 18 is not allocated
+The inode object 0x7c2b25 idx 19 is not allocated
+The inode object 0x7c2b25 idx 20 is not allocated
+The inode object 0x7c2b25 idx 21 is not allocated
+The inode object 0x7c2b25 idx 22 is not allocated
+The inode object 0x7c2b25 idx 23 is not allocated
+The inode object 0x7c2b25 idx 24 is not allocated
+STORE	DATA	VDI	VMSTATE	ATTR	STALE
+0	0	1	0	0	0
+1	0	1	0	0	0
+2	0	1	0	0	0

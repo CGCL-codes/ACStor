@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Test discard/trim
+. ./common
+
+for i in 0 1 2; do
+	_start_sheep $i "-w size=200"
+done
+_wait_for_sheep 3
+_cluster_format
+$DOG vdi create test 100M
+dd if=/dev/zero | $DOG vdi write -w test
+$QEMU_IO -c "discard 0 100m" sheepdog:test | _filter_qemu_io
+$DOG vdi check test
+for i in `seq 0 24`; do
+	$DOG vdi object test -i $i;
+done
+_node_info

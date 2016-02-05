@@ -1,0 +1,52 @@
+{
+	corosync 2.0.1 and libqb 0.14.1
+	Memcheck:Param
+	socketcall.sendto(msg)
+	fun:send
+	fun:qb_ipc_us_send
+	fun:qb_ipcc_us_setup_connect
+	fun:qb_ipcc_connect
+	fun:corosync_cfg_initialize
+}
+{
+	corosync 1.4.1
+	Memcheck:Param
+	socketcall.sendmsg(msg.msg_iov[i])
+	fun:__sendmsg_nocancel
+	fun:coroipcc_service_connect
+	fun:cpg_model_initialize
+	fun:cpg_initialize
+	fun:corosync_init
+}
+{
+	corosync 1.4.1
+	Memcheck:Param
+	socketcall.sendmsg(msg.msg_iov[i])
+	fun:__sendmsg_nocancel
+	fun:coroipcc_service_connect
+	fun:corosync_cfg_initialize
+	fun:corosync_init
+}
+{
+	zookeeper
+	Memcheck:Param
+	socketcall.sendto(msg)
+	fun:send
+	obj:*libzookeeper_mt.so*
+	fun:zookeeper_process
+}
+{
+	zookeeper
+	Memcheck:Cond
+	...
+	fun:zk_tree_search_nolock
+	fun:zk_watcher
+}
+{
+	zookeeper
+	Memcheck:Cond
+	fun:zk_handle_join_request
+	fun:zk_event_handler
+	fun:event_loop
+	fun:main
+}

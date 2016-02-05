@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Test sheep joining with older objects
+
+. ./common
+
+if [[ "$DRIVER" == zoo* ]];then
+    DRIVER=${DRIVER/1000/5000}
+fi
+
+# start 8 nodes
+for i in `seq 0 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 8
+
+_cluster_format
+
+$DOG vdi create test 100MB
+# create 25 objects
+for i in `seq 0 24`; do
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+# kill 5 nodes
+nr=8
+for i in `seq 3 7`; do
+    _wait_for_sheep $nr
+    _wait_for_sheep_recovery 0
+    _kill_sheep $i
+    nr=$(($nr - 1))
+done
+_wait_for_sheep 3
+
+# update vdi
+for i in `seq 0 24`; do
+    echo $(($i + 100)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+$DOG vdi read test | md5sum
+
+# start 5 nodes who have old objects
+for i in `seq 3 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 8
+
+for i in `seq 0 7`; do
+    $DOG vdi read test -p 700$i | md5sum
+done

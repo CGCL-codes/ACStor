@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Test sockfd connection
+
+. ./common
+
+trap "_uninit; exit \$status" 0 1 2 3 15
+_uninit()
+{
+	for i in `seq 1 7`; do
+		_cleanup_machine_simulation $i
+	done
+}
+
+_need_to_be_root
+
+for i in `seq 0 5`; do
+	_start_sheep $i
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 3
+
+$DOG vdi create test 40M
+_random | $DOG vdi write test &
+
+sleep 3
+# Test write timeout
+for i in `seq 1 4`; do
+	_simulate_machine_down $i
+done
+
+# wait for dog to finish
+wait
+_wait_for_sheep_recovery 0
+
+$DOG vdi read test | md5sum > $STORE/csum.1
+
+for i in `seq 0 9`; do
+	$DOG vdi object -i $i test
+done
+
+for i in 6 7 8; do
+	_start_sheep $i
+done
+
+_wait_for_sheep_recovery 0
+
+# Test read timeout
+$DOG vdi read test | md5sum > $STORE/csum.2 &
+for i in `seq 5 7`; do
+	_simulate_machine_down $i
+done
+wait
+
+diff -u $STORE/csum.1 $STORE/csum.2
+status=0

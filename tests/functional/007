@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Test cluster rejecting node with wrong epoch
+
+. ./common
+
+
+# create a node who has wrong epoch
+_start_sheep 1
+_wait_for_sheep 1 1
+_cluster_format -p 7001 -c 1
+$DOG cluster shutdown -p 7001
+_wait_for_sheep_stop
+
+# start Sheepdog with one node
+_start_sheep 0
+_wait_for_sheep 1
+_cluster_format -p 7000 -c 1
+
+_start_sheep 1  # should fail
+_wait_for_sheep_stop 1
+_wait_for_sheep 1
+_start_sheep 2  # should succeed
+_wait_for_sheep 2
+
+$DOG cluster info -p 7000 | _filter_cluster_info
+$DOG cluster info -p 7002 | _filter_cluster_info

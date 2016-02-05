@@ -1,0 +1,415 @@
+#!/usr/bin/perl
+#
+# Copyright (C) 2010 MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version
+# 2 as published by the Free Software Foundation.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+use feature 'switch';
+use strict;
+use Getopt::Std;
+use Time::HiRes qw(gettimeofday);
+use IPC::Open2;
+
+my $program = "vditest";
+my ($vdiname, $vdisize);
+
+my $concurrency = 1;
+my $nr_outstanding_aio = 0;
+my ($lblk, $hblk) = (512, 1048576);
+my $cache = 'writethrough';
+my $runtime = 10;
+my ($rrate, $wrate) = (100, 0);
+my $no_act = 0;
+my $offset = 0;
+my $seek_pattern = "linear";
+my $seed = time();
+my ($sblk, $eblk) = (0, 0);
+my $file = 0;
+my $flush_interval = 0;
+my $verbose = 0;
+my ($read_test, $write_test) = (0,0);
+my $hbeat = 0;
+my ($rd_bytes, $wr_bytes, $rd_ops, $wr_ops) = (0, 0, 0, 0);
+my ($total_rd_bytes, $total_wr_bytes, $total_rd_ops, $total_wr_ops) = (0, 0, 0, 0);
+
+$/ = 'qemu-io> ';
+
+parse();
+print_options();
+
+vdi_open($vdiname, $cache);
+
+vdi_main();
+
+vdi_flush();
+vdi_close();
+
+sub get_aligned_blk {
+    my ($l, $h) = @_;
+
+    return $l + 512 * int(rand($h - $l + 512) / 512);
+}
+
+sub to_bytes {
+    my ($size) = @_;
+
+    given ($size) {
+	when (/k(i?b)?$/i) { $size *= 1024; }
+	when (/m(i?b)?$/i) { $size *= 1024 ** 2; }
+	when (/g(i?b)?$/i) { $size *= 1024 ** 3; }
+    }
+
+    $_[0] = $size;
+}
+
+sub to_str {
+    my ($size) = @_;
+    my @units = ("", "K", "M", "G", "T", "P", "E", "Z", "Y");
+
+    while ($size >= 1024) {
+	shift @units;
+	$size /= 1024;
+    }
+
+    return sprintf "%.1f%s", $size, $units[0];
+}
+
+sub print_options {
+    my $opt = "options: ";
+
+    $opt .= "-B $lblk:$hblk ";
+    $opt .= "-c $cache ";
+    $opt .= "-C $concurrency ";
+    $opt .= "-D $rrate:$wrate ";
+    $opt .= "-n "  if $no_act;
+    $opt .= "-o $offset\n";
+    $opt .= "         ";
+    $opt .= "-p $seek_pattern ";
+    $opt .= "-s $seed ";
+    $opt .= "-S $sblk:$eblk ";
+    $opt .= "-T $runtime ";
+    $opt .= "-f $flush_interval\n";
+
+    print $opt;
+}
+
+sub print_qemu {
+    my ($cmd) = @_;
+
+    print $cmd  if $verbose;
+
+    print QEMU $cmd  if !$no_act;
+
+    my $result = <QEMU_OUT>;
+    if ($verbose) {
+	$result =~ s/qemu-io> //;
+	print $result;
+    }
+
+    while ($result =~ /wrote|read/g) {
+	$nr_outstanding_aio--;
+    }
+}
+
+sub wait_aio_requests {
+    my $old_sep = $/;
+    $/ = "\n";
+
+    my $result = <QEMU_OUT>;
+    if ($verbose) {
+	print $result;
+    }
+
+    while ($result =~ /wrote|read/g) {
+	$nr_outstanding_aio--;
+    }
+
+    $/ = $old_sep;
+}
+
+sub vdi_open {
+    my ($vdiname, $cache) = @_;
+    my $cmd;
+
+    return  if $no_act;
+
+    if ($file) {
+	$cmd = "stdbuf -o0 qemu-io -t $cache $vdiname";
+    } else {
+	$cmd = "stdbuf -o0 qemu-io -t $cache sheepdog:$vdiname";
+    }
+    open2 *QEMU_OUT, *QEMU, $cmd or die "cannot run qemu-io" if !$no_act;
+    <QEMU_OUT>;
+}
+
+sub vdi_close {
+    print_qemu("quit\n");
+
+    close QEMU  if !$no_act;
+}
+
+sub vdi_read {
+    my ($offset, $length) = @_;
+
+    print_qemu("aio_read $offset $length\n");
+
+    $nr_outstanding_aio++;
+    $rd_ops++;
+    $rd_bytes += $length;
+    $total_rd_ops++;
+    $total_rd_bytes += $length;
+}
+
+sub vdi_write {
+    my ($offset, $length) = @_;
+
+    print_qemu("aio_write $offset $length\n");
+
+    $nr_outstanding_aio++;
+    $wr_ops++;
+    $wr_bytes += $length;
+    $total_wr_ops++;
+    $total_wr_bytes += $length;
+}
+
+sub vdi_flush {
+    print_qemu("aio_flush\n");
+}
+
+sub parse_opts {
+    my %opts = ();
+
+    getopts("?B:c:C:D:f:Fh:no:p:rs:S:T:vw", \%opts) or help(1);
+
+    foreach my $key (keys %opts) {
+	my $val = $opts{$key};
+	given ($key) {
+	    when ('?') {
+		help(0);
+	    }
+	    when ('B') {
+		($lblk, $hblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
+		to_bytes($lblk);
+		to_bytes($hblk);
+		$hblk = $lblk  if $hblk == 0;
+
+		die "$lblk is not sector aligned" if $lblk % 512 != 0;
+		die "$lblk is not valid" if $lblk == 0;
+		die "$hblk is not sector aligned" if $hblk % 512 != 0;
+		die "$hblk is too large" if $lblk > (64 * 1024 ** 2);
+		die "transfer range is invalid" if $lblk > $hblk;
+	    }
+	    when ('c') {
+		if ($val !~ /(none|write(back|through))/) {
+		    die "'$val' is not valid";
+		}
+		$cache = $val;
+	    }
+	    when ('C') {
+		die "'$val' is not valid"  if $val <= 0;
+		$concurrency = $val;
+	    }
+	    when ('D') {
+		($rrate, $wrate) = ($val =~ /(\d+)\%?:?(\d*)\%?/);
+	    }
+	    when ('f') {
+		$flush_interval = $val;
+	    }
+	    when ('F') {
+		$file = 1;
+	    }
+	    when ('h') {
+		die "'$val' is not valid" if $val <= 0;
+		$hbeat = $val;
+	    }
+	    when ('n') {
+		$no_act = 1;
+		$verbose = 1;
+	    }
+	    when ('o') {
+		die "'$val' is not valid" if $val < 0;
+		$offset = $val;
+	    }
+	    when ('p') {
+		if ($val =~ /^l/) {
+		    $seek_pattern = "linear";
+		} elsif ($val =~ /^r/) {
+		    $seek_pattern = "random";
+		} else {
+		    die "'$val' is not valid";
+		}
+	    }
+	    when ('r') {
+		$read_test = 1;
+		if ($write_test) {
+		    ($rrate, $wrate) = (50, 50);
+		} else {
+		    ($rrate, $wrate) = (100, 0);
+		}
+	    }
+	    when ('s') {
+		$seed = $val;
+	    }
+	    when ('S') {
+		($sblk, $eblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
+		to_bytes($sblk);
+		to_bytes($eblk);
+
+		die "$sblk is not sector aligned" if $sblk % 512 != 0;
+		die "$eblk is not sector aligned" if $eblk % 512 != 0;
+	    }
+	    when ('T') {
+		die "'$val' is not valid" if $val < 0;
+		$runtime = $val;
+	    }
+	    when ('v') {
+		$verbose = 1;
+	    }
+	    when ('w') {
+		$write_test = 1;
+		if ($read_test) {
+		    ($rrate, $wrate) = (50, 50);
+		} else {
+		    ($rrate, $wrate) = (0, 100);
+		}
+	    }
+	}
+    }
+}
+
+sub parse {
+    parse_opts();
+    if (@ARGV == 0) {
+	die "vdiname must be specified";
+    } else {
+	$vdiname = shift @ARGV;
+
+	# process the rest of options
+	parse_opts()  if (@ARGV > 0);
+    }
+    die "too many arguments" if @ARGV > 0;
+
+    if ($file) {
+	$vdisize = `qemu-io -c length $vdiname`;
+    } else {
+	$vdisize = `qemu-io -c length sheepdog:$vdiname`;
+    }
+    to_bytes($vdisize);
+
+    die "cannot get vdi size" if $vdisize == 0;
+
+    $eblk = $vdisize  if $eblk == 0;
+
+    die "test block range is invalid" if $sblk >= $eblk;
+    die "transfer size is too large" if $hblk > $eblk - $sblk;
+}
+
+sub vdi_main {
+    my $roffset = $offset;
+    my $woffset = $offset;
+    my ($cur_time, $start_time, $end_time, $hbeat_time);
+
+    $start_time = $cur_time = get_current_time();
+    $hbeat_time = $start_time + $hbeat * 1000000;
+    $end_time = $start_time + $runtime * 1000000;
+
+    srand($seed);
+
+    while ($cur_time < $end_time) {
+	my $length = get_aligned_blk($lblk, $hblk);
+
+	while ($nr_outstanding_aio >= $concurrency) {
+	    wait_aio_requests();
+	}
+
+	if (rand($rrate + $wrate) < $rrate) {
+	    # read
+	    $length = $eblk - $roffset  if $roffset + $length > $eblk;
+
+	    vdi_read($roffset, $length);
+
+	    if ($seek_pattern eq 'linear') {
+		$roffset += $length;
+		$roffset -= $eblk - $sblk  while $roffset >= $eblk;
+	    } else {
+		$roffset = get_aligned_blk($sblk, $eblk - 512);
+	    }
+	} else {
+	    # write
+	    $length = $eblk - $woffset  if $woffset + $length > $eblk;
+
+	    vdi_write($woffset, $length);
+
+	    if ($seek_pattern eq 'linear') {
+		$woffset += $length;
+		$woffset -= $eblk - $sblk  while $woffset >= $eblk;
+	    } else {
+		$woffset = get_aligned_blk($sblk, $eblk - 512);
+	    }
+
+	    if ($flush_interval > 0 && $wr_ops % $flush_interval == 0) {
+		vdi_flush();
+	    }
+	}
+
+	$cur_time = get_current_time();
+	if ($hbeat > 0 && $hbeat_time <= $cur_time) {
+	    print_result('Heartbeat read', $rd_bytes, $rd_ops, $hbeat) if $rrate;
+	    print_result('Heartbeat write', $wr_bytes, $wr_ops, $hbeat) if $wrate;
+
+	    $rd_ops = $wr_ops = 0;
+	    $rd_bytes = $wr_bytes = 0;
+
+	    $hbeat_time += $hbeat * 1000000;
+	}
+    }
+
+    print_result('Total read', $total_rd_bytes, $total_rd_ops, $runtime) if $rrate;
+    print_result('Total write', $total_wr_bytes, $total_wr_ops, $runtime) if $wrate;
+}
+
+sub get_current_time {
+    my ($sec, $microsec) = gettimeofday();
+    return $sec * 1000000 + $microsec;
+}
+
+sub print_result {
+    my ($label, $bytes, $ops, $t) = @_;
+    printf "$label throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
+	   $bytes / $t, to_str($bytes / $t), $ops / $t;
+}
+
+sub help {
+    my ($status) = @_;
+    print <<END_OF_HELP;
+Usage: $program [OPTION] vdiname
+
+  -?                   display this help text and exit.
+  -B lblk[:hblk]       set the block transfer size.
+  -c cache             specify how to use the host cache.
+                       cache is "none", "writeback", or "writethrough".
+  -C concurrency       set the maximum number of concurrent I/O requests
+  -D r%:w%             duty cycle used while reading and/or writing.
+  -f flush_interval    specify that a flush should occur at flush_interval
+                       number of IO operations.
+  -F                   vdiname is not a sheepdog vdi but a local file
+  -h hbeat             displays performance statistic every <hbeat> seconds.
+  -n                   print events that would occur but do not access disk.
+  -o offset            set the start offset.
+  -p seek_pattern      set the pattern of disk seeks.
+                       seek_pattern is "linear" or "random".
+  -r                   read data from vdi.
+  -s seed              set seed for random number generation.
+  -S sblk[:eblk]       set the start [and stop] test block.
+  -T runtime           run until <runtime> seconds have elapsed.
+  -v                   verbose mode.
+  -w                   write data to vdi.
+
+END_OF_HELP
+    exit($status);
+}

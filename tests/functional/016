@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Test vdi clone functionality
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format -c 3
+$DOG vdi create base 100M -P
+
+$QEMU_IMG snapshot -c tag sheepdog:base
+
+sleep 1
+
+$DOG vdi clone -s 1 base test
+
+sleep 1
+
+$DOG vdi delete test
+
+sleep 1
+$DOG vdi delete base
+
+sleep 1
+$DOG vdi delete -s 1 base
+
+sleep 3
+echo there should be no vdi
+_vdi_list
+
+echo there should be no object
+_node_info

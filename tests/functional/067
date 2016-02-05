@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Test concurrent start up
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$DOG node list
+
+# make sure sheep1 and sheep2 quit simutaniously
+_kill_sheep 1 &
+_kill_sheep 2
+_wait_for_sheep_stop 1
+_wait_for_sheep_stop 2
+
+sleep 3
+
+for i in 2 1 ; do
+    _start_sheep $i
+done
+
+_kill_sheep 0
+_wait_for_sheep 2 2
+
+sleep 1
+
+echo check whether all nodes have the same cluster info
+for i in 1 2; do
+    $DOG node list -p 700$i
+done

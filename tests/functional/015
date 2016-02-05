@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Test vdi setattr/getattr failure mode
+
+. ./common
+
+for i in 0 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 2
+
+_cluster_format -c 2
+
+$DOG vdi create test 539545600
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+wait
+echo "there should be 3 setattr errors"
+
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+wait
+echo "there should be 8 setattr errors"
+
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+wait
+echo "there should be 6 setattr errors"
+
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+$DOG vdi setattr test lock 1 -x &
+wait
+echo "there should be 5 setattr errors"
