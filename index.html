@@ -28,19 +28,54 @@
     <div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
-          <h3>
-<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Introduction</h3>
+          <h1>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Introduction</h1>
 
 <p>In virtualized data centers, virtual disk images (VDIs) serve as the containers in virtual environment, so their access
 performance is critical for the overall system performance. Some distributed VDI chunk storage systems have been proposed in order to alleviate the I/O bottleneck for VM management. As the system scales up to a large number of running VMs, however, the overall network traffic would become unbalanced with hot spots on some VMs inevitably, leading to I/O performance degradation when accessing the VMs. In this paper, we propose an adaptive and collaborative VDI storage system (ACStor) to resolve the above performance issue. In comparison to the existing research, our solution is able to dynamically balance the traffic workloads in accessing VDI chunks, based on the run-time network state. Specifically, compute nodes with lightly loaded traffic will be adaptively assigned more chunk access requests from remote VMs and vice versa, which can effectively eliminate the above problem and thus improves the I/O performance of VMs.</p>
 
-<h3>
-<a id="architecture" class="anchor" href="#architecture" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Architecture</h3>
+<h1>
+<a id="architecture" class="anchor" href="#architecture" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Architecture</h1>
 
-<p><img src="http://7xizd0.com1.z0.glb.clouddn.com/acstor%2Farchitecture.jpg" alt="Architecture"></p>
+<h2>
+<a id="design-overview" class="anchor" href="#design-overview" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Design Overview</h2>
 
-<h3>
-<a id="support-or-contact" class="anchor" href="#support-or-contact" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Support or Contact</h3>
+<p><img src="http://7xizd0.com1.z0.glb.clouddn.com/acstor/design_overview.jpg" alt="design_overview"></p>
+
+<ul>
+<li>Private cache</li>
+</ul>
+
+<p>The first-level cache is a private cache which is deployed in the local disk of compute node. </p>
+
+<p>Each private cache employs copy-on-write (CoW) to serve a VM. </p>
+
+<ul>
+<li>Public cache</li>
+</ul>
+
+<p>Public cache (a.k.a., collaborative cache), which serves the reads sent from any VMs, works upon the read missing in the private cache.</p>
+
+<p>VDIs are cached in public caches in the form of data chunks.</p>
+
+<ul>
+<li>Image repository</li>
+</ul>
+
+<p>Back-end storage, which ensures that the chunks are available in target hosts.</p>
+
+<h2>
+<a id="adaptive-addressing-mode" class="anchor" href="#adaptive-addressing-mode" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Adaptive Addressing Mode</h2>
+
+<p><img src="http://7xizd0.com1.z0.glb.clouddn.com/acstor/addressing_mode.jpg" alt="addressing_mode"></p>
+
+<h2>
+<a id="mapping-and-remapping" class="anchor" href="#mapping-and-remapping" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Mapping and Remapping</h2>
+
+<p><img src="http://7xizd0.com1.z0.glb.clouddn.com/acstor/mapping_remapping.jpg" alt="mapping_remapping"></p>
+
+<h1>
+<a id="support-or-contact" class="anchor" href="#support-or-contact" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Support or Contact</h1>
 
 <p>ACStor is developed in the <a href="http://grid.hust.edu.cn/">HUST SCTS&amp;CGCL Lab</a>. If you are interested in trying out ACStor in your cloud storage system, please contact the authors. You are also welcomed to commit your modification for support in the project's page in github.</p>
         </section>
