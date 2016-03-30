@@ -262,6 +262,7 @@ static inline bool is_aligned_to_pagesize(void *p)
 
 int create_listen_port(char *bindaddr, int port);
 int init_unix_domain_socket(const char *dir);
+int init_unix_domain_socket_monitor(const char *dir);
 
 int init_store_driver(bool is_gateway);
 int init_global_pathnames(const char *d, char *);

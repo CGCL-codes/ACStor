@@ -586,21 +586,21 @@ static void sighup_handler(int signum)
 	kill(logger_pid, SIGHUP);
 }
 
-void *zmq_context;
-void *zmq_publisher;
+//void *zmq_context;
+//void *zmq_publisher;
 
-//void start_zmq_client() {
+//void start_zmq_client(void) {
 //	zmq_context = zmq_ctx_new();
 //	zmq_publisher = zmq_socket(zmq_context, ZMQ_PUB);
 	//int rc = zmq_bind(zmq_publisher, "ipc:///usr/muliss/zmq_tmp.ipc");
 //	int rc = zmq_bind(zmq_publisher, "tcp://*:9008");
 //	assert(rc == 0);
 //}
-
-void close_zmq_client() {
+/*
+void close_zmq_client(void) {
 	zmq_close(zmq_publisher);
 	zmq_ctx_destroy(zmq_context);
-}
+}*/
 
 int main(int argc, char **argv)
 {
@@ -819,6 +819,10 @@ int main(int argc, char **argv)
 	ret = init_unix_domain_socket(dir);
 	if (ret)
 		exit(1);
+
+	ret = init_unix_domain_socket_monitor(dir);
+	if(ret)
+			exit(1);
 
 	local_req_init();
 

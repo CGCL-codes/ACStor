@@ -294,7 +294,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 		PRINT_TO_LOG("MISS\n");
 		PRINT_TO_LOG("%s\n", path);
 		
-		//zmq_send(zmq_publisher, path, PATH_MAX, 0);
+	//	zmq_send(zmq_publisher, path, PATH_MAX, 0);
 	}
 
 

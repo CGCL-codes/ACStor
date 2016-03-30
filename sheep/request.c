@@ -872,6 +872,17 @@ int init_unix_domain_socket(const char *dir)
 					 &is_inet_socket);
 }
 
+int init_unix_domain_socket_monitor(const char *dir)
+{
+	static bool is_inet_socket;
+	char unix_path[PATH_MAX];
+
+	snprintf(unix_path, sizeof(unix_path), "%s/traffmonitor", dir);
+	unlink(unix_path);
+
+	return create_unix_domain_socket(unix_path, create_listen_port_fn, &is_inet_socket);
+}
+
 static void local_req_handler(int listen_fd, int events, void *data)
 {
 	struct request *req, *t;
